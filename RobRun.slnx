@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="RobRun.Demo/RobRun.Demo.csproj" />
+  <Project Path="RobRun.Server.Tests/RobRun.Server.Tests.csproj" />
+  <Project Path="RobRun.Server/RobRun.Server.csproj" />
+</Solution>

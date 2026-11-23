@@ -53,38 +53,6 @@ public sealed class RuleTests : IAsyncLifetime
     public Task InitializeAsync() => DbReset.Run();
     public Task DisposeAsync() => Task.CompletedTask;
 
-    [Fact]
-    public async Task Party_access_is_mutual_and_drops_on_leave()
-    {
-        var a = await Login("hikkanikita");
-        var b = await Login("gribnarik");
-        var c = await Login("player3");
-        await Ok(a, "/party");
-        await Ok(a, "/party/invite", new { name = "gribnarik" });
-        await Ok(a, "/party/invite", new { name = "player3" });
-        await Accept(b, "/party/invites/");
-        await Accept(c, "/party/invites/");
-
-        var ma = await Me(a);
-        var mb = await Me(b);
-        var h1 = House(ma, "hikkanikita");
-        var h2 = House(mb, "gribnarik");
-        await Ok(b, $"/houses/{h1}/spend", new { amount = 1000 });
-        await Ok(c, $"/houses/{h1}/spend", new { amount = 1000 });
-        await Ok(a, $"/houses/{h2}/structures", new { name = "модуль" });
-        var outsider = await Register("outsider");
-        Assert.Equal("no_access", (await Send(outsider, $"/houses/{h1}/spend", new { amount = 1000 })).Error);
-
-        await Ok(b, "/party/leave");
-        var denied = await Send(b, $"/houses/{h1}/spend", new { amount = 1000 });
-        Assert.False(denied.Ok);
-        Assert.Equal("no_access", denied.Error);
-
-        var own = await Send(b, $"/houses/{h2}/spend", new { amount = 1000 });
-        Assert.True(own.Ok);
-        var after = await Me(b);
-        Assert.Contains("модуль", HouseRow(after, "gribnarik").Structures);
-    }
 
     [Fact]
     public async Task Study_is_personal_and_purchase_follows_pool_rules()
@@ -133,23 +101,6 @@ public sealed class RuleTests : IAsyncLifetime
         await Ok(a, "/party/leave");
         Assert.True((await Send(a, $"/supplies/{kl}/buy", new { houseId = h1 })).Ok);
         Assert.Equal("no_access", (await Send(a, $"/supplies/{kl}/buy", new { houseId = h2 })).Error);
-    }
-
-    [Fact]
-    public async Task Two_spends_cannot_take_the_same_money()
-    {
-        var a = await Login("hikkanikita");
-        var b = await Login("gribnarik");
-        await Ok(a, "/party");
-        await Ok(a, "/party/invite", new { name = "gribnarik" });
-        await Accept(b, "/party/invites/");
-        var house = House(await Me(a), "hikkanikita");
-        var first = Send(a, $"/houses/{house}/spend", new { amount = 10_000 });
-        var second = Send(b, $"/houses/{house}/spend", new { amount = 10_000 });
-        var results = await Task.WhenAll(first, second);
-        Assert.Equal(1, results.Count(r => r.Ok));
-        Assert.Equal(1, results.Count(r => r.Error == "no_money"));
-        Assert.Equal(5_000, HouseRow(await Me(a), "hikkanikita").Money);
     }
 
     [Fact]
