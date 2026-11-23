@@ -12,7 +12,7 @@ public sealed class PartyService(AppDb db, IGameNotifier notifier)
         if (player is null) return OpResult.Fail("not_found", "Игрок не найден");
         if (player.PartyId is not null) return OpResult.Fail("in_party", "Вы уже в пачке");
 
-        var party = new Party();
+        var party = new Party { LeaderId = playerId };
         db.Parties.Add(party);
         await db.SaveChangesAsync(ct);
         player.PartyId = party.Id;
@@ -92,5 +92,38 @@ public sealed class PartyService(AppDb db, IGameNotifier notifier)
         await tx.CommitAsync(ct);
         await notifier.Changed("party", partyId.Value, ct);
         return OpResult.Success("Вы вышли из пачки");
+    }
+
+    public async Task<OpResult> Kick(int leaderId, string targetName, CancellationToken ct)
+    {
+        var leader = await db.Players.AsNoTracking().FirstAsync(p => p.Id == leaderId, ct);
+        if (leader.PartyId is null) return OpResult.Fail("not_in_party", "Вы не в пачке");
+
+        var party = await db.Parties.AsNoTracking().FirstAsync(p => p.Id == leader.PartyId, ct);
+        if (party.LeaderId != leaderId) return OpResult.Fail("not_leader", "Только лидер может исключать участников");
+
+        var target = await db.Players.AsNoTracking().FirstOrDefaultAsync(p => p.Name == targetName.Trim(), ct);
+        if (target is null) return OpResult.Fail("not_found", "Игрок не найден");
+        if (target.Id == leaderId) return OpResult.Fail("validation", "Нельзя исключить себя");
+        if (target.PartyId != leader.PartyId) return OpResult.Fail("not_in_party", "Игрок не в вашей пачке");
+
+        await using var tx = await SqlGate.Begin(db, ct);
+        var memberIds = await db.Players.Where(p => p.PartyId == leader.PartyId).Select(p => p.Id).ToListAsync(ct);
+        foreach (var id in memberIds)
+            await SqlGate.LockPlayer(db, id, ct);
+
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Players SET PartyId = NULL WHERE Id = {target.Id}", ct);
+
+        var left = memberIds.Count - 1;
+        if (left < 2)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Players SET PartyId = NULL WHERE PartyId = {leader.PartyId}", ct);
+            await db.PartyInvites.Where(i => i.PartyId == leader.PartyId).ExecuteDeleteAsync(ct);
+            await db.Parties.Where(p => p.Id == leader.PartyId).ExecuteDeleteAsync(ct);
+        }
+
+        await tx.CommitAsync(ct);
+        await notifier.Changed("party", leader.PartyId.Value, ct);
+        return OpResult.Success($"Игрок {targetName} исключён из пачки");
     }
 }

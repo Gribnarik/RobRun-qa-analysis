@@ -16,5 +16,7 @@ public static class PartyEndpoints
             HttpMap.From(await party.Accept(user.PlayerId, id, ct)));
         g.MapPost("/leave", async (ICurrentUser user, PartyService party, CancellationToken ct) =>
             HttpMap.From(await party.Leave(user.PlayerId, ct)));
+        g.MapPost("/kick", async (NameBody body, ICurrentUser user, PartyService party, CancellationToken ct) =>
+            HttpMap.From(await party.Kick(user.PlayerId, body.Name, ct)));
     }
 }
