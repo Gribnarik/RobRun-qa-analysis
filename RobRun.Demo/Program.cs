@@ -23,7 +23,7 @@ while (true)
             await Problem1Demo.Run();
             break;
         case "2":
-            Console.WriteLine("⚠️  Проблема 2 ещё не реализована в демо");
+            await Problem2Demo.Run();
             break;
         case "3":
             Console.WriteLine("⚠️  Проблема 3 ещё не реализована в демо");
