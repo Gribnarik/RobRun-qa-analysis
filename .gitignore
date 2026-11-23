@@ -1,0 +1,27 @@
+# Build outputs
+bin/
+obj/
+
+# NuGet
+*.nupkg
+project.nuget.cache
+nuget.config
+
+# Compiled files
+*.dll
+*.exe
+*.pdb
+*.mdb
+
+# IDE files
+.vs/
+*.user
+*.suo
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test results
+TestResults/
